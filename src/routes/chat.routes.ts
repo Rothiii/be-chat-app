@@ -10,6 +10,41 @@ const router = Router();
 router.use(authenticate);
 
 /**
+ * GET /chat/users
+ * Get all users (potential contacts) with their online status
+ */
+router.get('/users', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    // Get all users except the current user
+    const allUsers = await db.query.users.findMany({
+      columns: {
+        id: true,
+        email: true,
+        username: true,
+        avatarUrl: true,
+        isOnline: true,
+        lastSeen: true,
+      },
+    });
+
+    // Filter out current user
+    const filteredUsers = allUsers.filter(user => user.id !== userId);
+
+    res.status(200).json({ users: filteredUsers });
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /chat/conversations
  * Get all conversations for the current user
  */
