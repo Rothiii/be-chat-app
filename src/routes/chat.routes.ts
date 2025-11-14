@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../lib/db';
 import { conversations, messages, conversationParticipants, users } from '../db/schema';
 import { authenticate } from '../lib/auth';
-import { eq, and, desc, asc, or, inArray, ne } from 'drizzle-orm';
+import { eq, and, desc, asc, or, inArray, ne, gt } from 'drizzle-orm';
 import { io } from '../lib/socket';
 
 const router = Router();
@@ -86,7 +86,7 @@ router.get('/conversations', async (req: Request, res: Response): Promise<void> 
           where: and(
             eq(messages.conversationId, cp.conversationId),
             cp.lastReadAt
-              ? desc(messages.createdAt) // Messages created after lastReadAt
+              ? gt(messages.createdAt, cp.lastReadAt) // Messages created after lastReadAt
               : undefined
           ),
         });
