@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../lib/db';
 import { conversations, messages, conversationParticipants, users } from '../db/schema';
 import { authenticate } from '../lib/auth';
-import { eq, and, desc, or, inArray } from 'drizzle-orm';
+import { eq, and, desc, asc, or, inArray } from 'drizzle-orm';
 
 const router = Router();
 
@@ -153,10 +153,10 @@ router.get('/conversations/:conversationId/messages', async (req: Request, res: 
       return;
     }
 
-    // Get messages
+    // Get messages (oldest first for chat display)
     const conversationMessages = await db.query.messages.findMany({
       where: eq(messages.conversationId, conversationId),
-      orderBy: [desc(messages.createdAt)],
+      orderBy: [asc(messages.createdAt)],
       limit: Number(limit),
       offset: Number(offset),
       with: {
@@ -215,6 +215,20 @@ router.post('/conversations/:conversationId/messages', async (req: Request, res:
     await db.update(conversations)
       .set({ updatedAt: new Date() })
       .where(eq(conversations.id, conversationId));
+
+    // Get sender info
+    const sender = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    // Emit message to conversation room via Socket.IO
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`conversation:${conversationId}`).emit('message:new', {
+        ...message,
+        sender,
+      });
+    }
 
     res.status(201).json({ message });
   } catch (error) {

@@ -4,6 +4,7 @@ import cors from 'cors';
 import * as dotenv from 'dotenv';
 import { initializeSocketServer } from './lib/socket';
 import { errorHandler, notFoundHandler } from './middleware/error';
+import { loggerMiddleware } from './middleware/logger';
 import authRoutes from './routes/auth.routes';
 import chatRoutes from './routes/chat.routes';
 
@@ -26,13 +27,8 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging middleware (development)
-if (process.env.NODE_ENV === 'development') {
-  app.use((req: Request, res: Response, next) => {
-    console.log(`${req.method} ${req.path}`);
-    next();
-  });
-}
+// Request logging middleware with Morgan
+app.use(loggerMiddleware);
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
@@ -61,8 +57,8 @@ app.use(errorHandler);
 
 // Start server
 httpServer.listen(PORT, () => {
-  console.log(`=€ Server running on port ${PORT}`);
-  console.log(`=á Socket.IO server initialized`);
+  console.log(`=ï¿½ Server running on port ${PORT}`);
+  console.log(`=ï¿½ Socket.IO server initialized`);
   console.log(`< Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`= CORS enabled for: ${CORS_ORIGIN}`);
 });
