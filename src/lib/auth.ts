@@ -11,6 +11,7 @@ declare global {
       user?: {
         id: string;
         email: string;
+        username?: string;
         role?: string;
       };
     }
@@ -44,10 +45,16 @@ export const authenticate = async (
       return;
     }
 
+    // Get user data from database to include username
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, user.id),
+    });
+
     // Attach user to request
     req.user = {
       id: user.id,
       email: user.email!,
+      username: dbUser?.username || user.email?.split('@')[0],
       role: user.role,
     };
 
@@ -75,9 +82,15 @@ export const optionalAuth = async (
       const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
       if (!error && user) {
+        // Get user data from database to include username
+        const dbUser = await db.query.users.findFirst({
+          where: eq(users.id, user.id),
+        });
+
         req.user = {
           id: user.id,
           email: user.email!,
+          username: dbUser?.username || user.email?.split('@')[0],
           role: user.role,
         };
       }
