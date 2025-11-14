@@ -130,14 +130,45 @@ router.post('/conversations', async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Create conversation
+    const allParticipants = [...new Set([userId, ...participantIds])];
+
+    // For non-group chats (1-on-1), check if conversation already exists
+    if (!isGroup && allParticipants.length === 2) {
+      // Find existing conversation with the same participants
+      const existingConversations = await db.query.conversationParticipants.findMany({
+        where: eq(conversationParticipants.userId, userId),
+        with: {
+          conversation: {
+            with: {
+              participants: true,
+            },
+          },
+        },
+      });
+
+      // Check if any conversation has exactly the same participants and is not a group
+      for (const cp of existingConversations) {
+        const conv = cp.conversation;
+        if (!conv.isGroup && conv.participants && conv.participants.length === 2) {
+          const participantUserIds = conv.participants.map(p => p.userId).sort();
+          const requestedUserIds = allParticipants.sort();
+
+          if (JSON.stringify(participantUserIds) === JSON.stringify(requestedUserIds)) {
+            // Conversation already exists, return it
+            res.status(200).json({ conversation: conv });
+            return;
+          }
+        }
+      }
+    }
+
+    // Create conversation if not found
     const [conversation] = await db.insert(conversations).values({
       name,
       isGroup: isGroup || participantIds.length > 1,
     }).returning();
 
     // Add participants (including creator)
-    const allParticipants = [...new Set([userId, ...participantIds])];
     await db.insert(conversationParticipants).values(
       allParticipants.map(pId => ({
         conversationId: conversation.id,
