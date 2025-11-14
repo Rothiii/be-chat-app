@@ -2,7 +2,8 @@ import { Router, Request, Response } from 'express';
 import { db } from '../lib/db';
 import { conversations, messages, conversationParticipants, users } from '../db/schema';
 import { authenticate } from '../lib/auth';
-import { eq, and, desc, asc, or, inArray } from 'drizzle-orm';
+import { eq, and, desc, asc, or, inArray, ne } from 'drizzle-orm';
+import { io } from '../lib/socket';
 
 const router = Router();
 
@@ -378,7 +379,33 @@ router.post('/conversations/:conversationId/read', async (req: Request, res: Res
         )
       );
 
-    res.status(200).json({ message: 'Conversation marked as read' });
+    // Update all messages from other users in this conversation to 'read' status
+    const updatedMessages = await db.update(messages)
+      .set({ status: 'read' })
+      .where(
+        and(
+          eq(messages.conversationId, conversationId),
+          ne(messages.senderId, userId), // Only update messages NOT sent by current user
+          ne(messages.status, 'read') // Only update if not already read
+        )
+      )
+      .returning();
+
+    // Emit socket event for each updated message
+    if (updatedMessages.length > 0 && io) {
+      updatedMessages.forEach((message) => {
+        io.to(`conversation:${conversationId}`).emit('message:status:update', {
+          messageId: message.id,
+          status: 'read',
+          updatedBy: userId,
+        });
+      });
+    }
+
+    res.status(200).json({
+      message: 'Conversation marked as read',
+      updatedMessagesCount: updatedMessages.length
+    });
   } catch (error) {
     console.error('Mark as read error:', error);
     res.status(500).json({ error: 'Internal server error' });
