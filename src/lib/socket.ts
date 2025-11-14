@@ -164,6 +164,16 @@ export const initializeSocketServer = (httpServer: HTTPServer) => {
           ...message,
           sender,
         });
+
+        // Emit conversation update to all participants to refresh their conversation list
+        // This ensures the conversation list updates with the new message
+        io.to(`conversation:${conversationId}`).emit('conversation:update', {
+          conversationId,
+          lastMessage: {
+            ...message,
+            sender,
+          },
+        });
       } catch (error) {
         console.error('Send message error:', error);
         socket.emit('error', { message: 'Failed to send message' });

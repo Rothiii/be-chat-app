@@ -77,7 +77,33 @@ router.get('/conversations', async (req: Request, res: Response): Promise<void> 
       },
     });
 
-    res.status(200).json({ conversations: userConversations });
+    // Calculate unread count for each conversation
+    const conversationsWithUnread = await Promise.all(
+      userConversations.map(async (cp) => {
+        // Count messages created after user's last read
+        const unreadMessages = await db.query.messages.findMany({
+          where: and(
+            eq(messages.conversationId, cp.conversationId),
+            cp.lastReadAt
+              ? desc(messages.createdAt) // Messages created after lastReadAt
+              : undefined
+          ),
+        });
+
+        // Count unread messages (messages after lastReadAt and not from current user)
+        const unreadCount = unreadMessages.filter(msg => {
+          if (!cp.lastReadAt) return msg.senderId !== userId;
+          return msg.createdAt > cp.lastReadAt && msg.senderId !== userId;
+        }).length;
+
+        return {
+          ...cp,
+          unreadCount,
+        };
+      })
+    );
+
+    res.status(200).json({ conversations: conversationsWithUnread });
   } catch (error) {
     console.error('Get conversations error:', error);
     res.status(500).json({ error: 'Internal server error' });
