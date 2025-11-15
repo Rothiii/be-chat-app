@@ -2,9 +2,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../lib/db';
 import { conversations, messages, conversationParticipants, users } from '../db/schema';
 import { authenticate } from '../lib/auth';
-import { eq, and, desc, asc, or, inArray, ne, gt } from 'drizzle-orm';
-import { io } from '../lib/socket';
-
+import { eq, and, desc, asc, ne, gt } from 'drizzle-orm';
 const router = Router();
 
 // All chat routes require authentication
@@ -423,6 +421,7 @@ router.post('/conversations/:conversationId/read', async (req: Request, res: Res
       .returning();
 
     // Emit socket event for each updated message
+    const io = req.app.get('io');
     if (updatedMessages.length > 0 && io) {
       updatedMessages.forEach((message) => {
         io.to(`conversation:${conversationId}`).emit('message:status:update', {
@@ -432,7 +431,6 @@ router.post('/conversations/:conversationId/read', async (req: Request, res: Res
         });
       });
     }
-
     res.status(200).json({
       message: 'Conversation marked as read',
       updatedMessagesCount: updatedMessages.length
